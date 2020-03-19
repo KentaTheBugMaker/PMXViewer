@@ -6,6 +6,7 @@ use std::intrinsics::transmute;
 use std::io::{BufReader, Error, Read};
 use std::path::Path;
 use self::encoding::{DecoderTrap, Encoding};
+use std::fmt::{Display, Formatter};
 
 type Vec2 = [f32; 2];
 type Vec3 = [f32; 3];
@@ -106,18 +107,74 @@ pub struct PMXVertex {
     sdef_r1: Vec3,
     edge_mag: f32,
 }
+
+impl Display for PMXVertex {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f,"Vertex:[position:{:?} norm:{:?} uv:{:?}]",self.position,self.norm ,self.uv);
+        if [[0.0f32;4];4] !=self.add_uv{
+            for add_uv in &self.add_uv{
+                write!(f,"{:?}",add_uv);
+            }
+        }
+        match self.weight_type{
+            PMXVertexWeight::BDEF1 => {
+                writeln!(f,
+                    "BDEF1:[{}]",self.bone_indices[0]
+                );
+            },
+            PMXVertexWeight::BDEF2 => {
+                writeln!(f,"BDEF2:[index1:{} index2:{} weight1{}]",self.bone_indices[0],self.bone_indices[1],self.bone_weights[0]);
+            },
+            PMXVertexWeight::BDEF4 => {
+
+            },
+            PMXVertexWeight::SDEF => {
+
+            },
+            PMXVertexWeight::QDEF => {
+
+            },
+        }
+        writeln!(f,"edgeMagnifier:{}",self.edge_mag);
+        Ok(())
+    }
+}
 /*Represent Triangle*/
-#[derive(Debug)]
 pub struct PMXFace {
     vertices: [u32; 3]
 }
-#[derive(Debug)]
+
+impl Display for PMXFace {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        writeln!(f,"Triangle:[{},{},{}]",self.vertices[0],self.vertices[1],self.vertices[2]);
+        Ok(())
+    }
+}
+
 pub struct PMXFaces{
     faces:Vec<PMXFace>
 }
-#[derive(Debug)]
+
+impl Display for PMXFaces {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(),std::fmt::Error> {
+        writeln!(f,"Triangles:{}",self.faces.len());
+        for triangle in self.faces.iter(){
+            write!(f,"{}",triangle);
+        }
+        Ok(())
+    }
+}
 pub struct PMXTextureList{
     textures:Vec<String>
+}
+impl Display for PMXTextureList{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+      writeln!(f,"Textures:{}",self.textures.len());
+        for name in self.textures.iter(){
+            writeln!(f,"{}",name);
+        }
+        Ok(())
+    }
 }
 enum PMXDrawModeFlags {
     BothFace = 0x01,
@@ -234,7 +291,6 @@ impl BinaryReader {
     }
     pub fn read_texture_list(&mut self, header:&PMXHeaderRust) ->PMXTextureList{
         let textures=self.read_i32();
-        println!("{}",textures);
         let mut v=vec![];
         for _ in 0..textures{
             v.push(self.read_text_buf(header.encode));

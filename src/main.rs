@@ -15,12 +15,11 @@ let filename=env::args().skip(1).next().unwrap();
             println!("Starting Read Faces");
             let faces=reader.read_pmxfaces(&header);
             println!("End Read Faces");
-           // println!("{:#?}",faces);
+            println!("{}",faces);
             println!("Starting Read Texture Names ...");
             let texturelist=reader.read_texture_list(&header);
-          //  let textures=reader.ReadI32();
     
-            println!("{:#?}",texturelist);
+            println!("{}",texturelist);
             println!("End Read Texture Name");
             //println!("{:#?}",texturelist);
         }
