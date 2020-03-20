@@ -77,27 +77,27 @@ pub mod pmx_loader {
             ctx.comment_en = self.inner.read_text_buf(enc);
             ctx
         }
-        pub fn read_texture_list(&mut self, header: &PMXHeaderRust) -> PMXTextureList {
+        pub fn read_texture_list(&mut self) -> PMXTextureList {
             let textures = self.inner.read_i32();
             let mut v = vec![];
             for _ in 0..textures {
-                v.push(self.inner.read_text_buf(header.encode));
+                v.push(self.inner.read_text_buf(self.header.encode));
             }
             PMXTextureList { textures: v }
         }
 
-        pub fn read_pmx_vertices(&mut self, header: &PMXHeaderRust) -> PMXVertices {
+        pub fn read_pmx_vertices(&mut self) -> PMXVertices {
             let mut ctx = PMXVertices { vertices: vec![] };
             let verts = self.inner.read_i32();
             let mut v = Vec::with_capacity(verts as usize);
             for _ in 0..verts {
-                v.push(self.read_pmx_vertex(header));
+                v.push(self.read_pmx_vertex());
             }
             assert_eq!(verts as usize, v.len());
             ctx.vertices = v;
             ctx
         }
-        pub fn read_pmx_vertex(&mut self, header: &PMXHeaderRust) -> PMXVertex {
+        pub fn read_pmx_vertex(&mut self) -> PMXVertex {
             let mut ctx = PMXVertex {
                 position: [0.0f32; 3],
                 norm: [0.0f32; 3],
@@ -114,8 +114,8 @@ pub mod pmx_loader {
             ctx.position = self.inner.read_vec3();
             ctx.norm = self.inner.read_vec3();
             ctx.uv = self.inner.read_vec2();
-            let additional_uv = header.additional_uv as usize;
-            let size = header.s_bone_index;
+            let additional_uv = self.header.additional_uv as usize;
+            let size = self.header.s_bone_index;
             if additional_uv > 0 {
                 for i in 0..additional_uv {
                     ctx.add_uv[i] = self.inner.read_vec4();
@@ -183,10 +183,10 @@ pub mod pmx_loader {
             ctx.edge_mag = self.inner.read_f32();
             ctx
         }
-        pub fn read_pmxfaces(&mut self, header: &PMXHeaderRust) -> PMXFaces {
+        pub fn read_pmx_faces(&mut self) -> PMXFaces {
             let mut ctx = PMXFaces { faces: vec![] };
             let faces = self.inner.read_i32();
-            let s_vertex_index = header.s_vertex_index;
+            let s_vertex_index = self.header.s_vertex_index;
             println!("{}", faces);
             let faces = faces / 3;
             for _ in 0..faces {
@@ -198,18 +198,18 @@ pub mod pmx_loader {
             assert_eq!(ctx.faces.len(), faces as usize);
             ctx
         }
-        pub fn read_pmxmaterials(&mut self, header: &PMXHeaderRust) -> PMXMaterials {
+        pub fn read_pmx_materials(&mut self) -> PMXMaterials {
             let mut ctx = PMXMaterials { materials: vec![] };
             let counts = self.inner.read_i32();
             for _ in 0..counts {
-                let material = self.read_pmx_material(header);
+                let material = self.read_pmx_material();
                 println!("{:#?}", material);
                 ctx.materials.push(material);
             }
             ctx
         }
-        pub fn read_pmx_material(&mut self, header: &PMXHeaderRust) -> PMXMaterial {
-            let s_texture_index = header.s_texture_index;
+        pub fn read_pmx_material(&mut self) -> PMXMaterial {
+            let s_texture_index = self.header.s_texture_index;
             let mut ctx = PMXMaterial {
                 name: "".to_string(),
                 english_name: "".to_string(),
@@ -228,8 +228,8 @@ pub mod pmx_loader {
                 memo: "".to_string(),
                 num_face_vertices: 0,
             };
-            ctx.name = self.inner.read_text_buf(header.encode);
-            ctx.english_name = self.inner.read_text_buf(header.encode);
+            ctx.name = self.inner.read_text_buf(self.header.encode);
+            ctx.english_name = self.inner.read_text_buf(self.header.encode);
             ctx.diffuse = self.inner.read_vec4();
             ctx.specular = self.inner.read_vec3();
             ctx.specular_factor = self.inner.read_f32();
@@ -265,7 +265,7 @@ pub mod pmx_loader {
                     self.inner.read_u8() as i32
                 }
             };
-            ctx.memo = self.inner.read_text_buf(header.encode);
+            ctx.memo = self.inner.read_text_buf(self.header.encode);
             ctx.num_face_vertices = self.inner.read_i32();
             ctx
         }

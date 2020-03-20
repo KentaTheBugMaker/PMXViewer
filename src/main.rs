@@ -11,4 +11,6 @@ fn main() {
     println!("{:#?}", header);
     let model_info = loader.read_pmx_model_info();
     print!("{:#?}", model_info);
+    let vertices = loader.read_pmx_vertices();
+    print!("{}", vertices);
 }

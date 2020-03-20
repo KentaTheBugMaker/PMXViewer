@@ -1,5 +1,5 @@
 pub mod pmx_types {
-    use std::fmt::{Display, Formatter};
+    use std::fmt::{Display, Error, Formatter};
 
     pub type Vec2 = [f32; 2];
     pub type Vec3 = [f32; 3];
@@ -190,9 +190,19 @@ pub mod pmx_types {
         pub vertices: Vec<PMXVertex>
     }
 
+    impl Display for PMXVertices {
+        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+            write!(f, "Vertices:{}", self.vertices.len());
+            for vertex in self.vertices.iter() {
+                writeln!(f, "{}", vertex);
+            }
+            Ok(())
+        }
+    }
+
     impl Display for PMXVertex {
         fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-            write!(f, "Vertex:[position:{:?} norm:{:?} uv:{:?}]", self.position, self.norm, self.uv);
+            writeln!(f, "Vertex:[position:{:?} norm:{:?} uv:{:?}]", self.position, self.norm, self.uv);
             if [[0.0f32; 4]; 4] != self.add_uv {
                 for add_uv in &self.add_uv {
                     write!(f, "{:?}", add_uv);
@@ -207,9 +217,16 @@ pub mod pmx_types {
                 PMXVertexWeight::BDEF2 => {
                     writeln!(f, "BDEF2:[index1:{} index2:{} weight1{}]", self.bone_indices[0], self.bone_indices[1], self.bone_weights[0]);
                 }
-                PMXVertexWeight::BDEF4 => {}
-                PMXVertexWeight::SDEF => {}
-                PMXVertexWeight::QDEF => {}
+                PMXVertexWeight::BDEF4 => {
+                    writeln!(f, "BDEF4:[index1:{} index2:{} index3:{} index4:{}, weight1:{} weight2:{} weight3:{} weight4:{}]", self.bone_indices[0], self.bone_indices[1], self.bone_indices[2], self.bone_indices[3], self.bone_weights[0], self.bone_weights[1], self.bone_weights[2], self.bone_weights[3]);
+                }
+                PMXVertexWeight::SDEF => {
+                    writeln!(f, "SDEF:[index1:{} index2:{} weight1{}]", self.bone_indices[0], self.bone_indices[1], self.bone_weights[0]);
+                    writeln!(f, "SDEF Specific Params:[ C:[{:?}] R0:[{:?}] R1:[{:?}] ]", self.sdef_c, self.sdef_r0, self.sdef_r1);
+                }
+                PMXVertexWeight::QDEF => {
+                    writeln!(f, "BDEF4:[index1:{} index2:{} index3:{} index4:{}, weight1:{} weight2:{} weight3:{} weight4:{}]", self.bone_indices[0], self.bone_indices[1], self.bone_indices[2], self.bone_indices[3], self.bone_weights[0], self.bone_weights[1], self.bone_weights[2], self.bone_weights[3]);
+                }
             }
             writeln!(f, "edgeMagnifier:{}", self.edge_mag);
             Ok(())
