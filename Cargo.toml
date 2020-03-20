@@ -7,13 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-encoding="0.2.33"
-PMXUtil={path="PMXUtil"}
-[dependencies.gtk]
-version = "0.8.1"
-features = ["v3_16"]
 
-[dependencies.gio]
-version = ""
-features = ["v2_44"]
+PMXUtil={path="PMXUtil"}
+
 
