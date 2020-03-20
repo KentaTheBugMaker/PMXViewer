@@ -17,6 +17,12 @@
   5. Parse Joint
   6. Parse SoftBody
 ### How to Use
+1. Import
+```
+extern crate PMXUtil;
+use PMXUtil::pmx_loader::pmx_loader::PMXLoader;
+```
+2. Create loader instance and read  
 ```
 let mut loader=PMXLoader::open(/path/to/pmxfile);
 //get header information
