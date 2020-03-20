@@ -1,5 +1,5 @@
 [package]
-name = "PMXLoader"
+name = "pmxloader"
 version = "0.1.0"
 authors = ["t18b219k"]
 edition = "2018"
