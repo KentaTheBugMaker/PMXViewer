@@ -27,8 +27,8 @@ use PMXUtil::pmx_loader::pmx_loader::PMXLoader;
 let mut loader=PMXLoader::open("/path/to/pmxfile");
 //get header information
 let header=loader.get_header();
-//get model information
-let model_info=loader.read_pmx_model_info();
+//get model information returns Result<PMXModelInfo,()>
+let model_info=loader.read_pmx_model_info().unwrap();
 ```
 
 
