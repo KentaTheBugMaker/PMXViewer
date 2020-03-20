@@ -11,7 +11,21 @@ pub mod pmx_types {
         UTF8 = 0x01,
         Utf16Le = 0x00,
     }
-
+    /*Bone Flag*/
+    pub const BONE_FLAG_TARGET_SHOW_MODE_MASK: u16 = 0x0001;
+    pub const BONE_FLAG_ALLOW_ROTATE_MASK: u16 = 0x0002;
+    pub const BONE_FLAG_ALLOW_TRANSLATE_MASK: u16 = 0x0004;
+    pub const BONE_FLAG_VISIBLE_MASK: u16 = 0x0008;
+    pub const BONE_FLAG_ALLOW_CONTROL_MASK: u16 = 0x0010;
+    pub const BONE_FLAG_IK_MASK: u16 = 0x0020;
+    pub const BONE_FLAG_APPEND_LOCAL_MASK: u16 = 0x0080;
+    pub const BONE_FLAG_APPEND_ROTATE_MASK: u16 = 0x0100;
+    pub const BONE_FLAG_APPEND_TRANSLATE_MASK: u16 = 0x0200;
+    pub const BONE_FLAG_FIXED_AXIS_MASK: u16 = 0x0400;
+    pub const BONE_FLAG_LOCAL_AXIS_MASK: u16 = 0x0800;
+    pub const BONE_FLAG_DEFORM_AFTER_PHYSICS_MASK: u16 = 0x1000;
+    pub const BONE_FLAG_DEFORM_OUTER_PARENT_MASK: u16 = 0x2000;
+    /*Material Flag*/
     const MATERIAL_DOUBLE_SIDE_MASK: u8 = 0x01;
     const MATERIAL_GROUND_SHADOW_MASK: u8 = 0x02;
     const MATERIAL_CAST_SELF_SHADOW_MASK: u8 = 0x04;
@@ -23,10 +37,10 @@ pub mod pmx_types {
 
     #[repr(packed)]
     pub struct PMXHeaderC {
-        pub magic: [u8; 4],
-        pub version: f32,
-        pub length: u8,
-        pub config: [u8; 8],
+        pub(crate) magic: [u8; 4],
+        pub(crate) version: f32,
+        pub(crate) length: u8,
+        pub(crate) config: [u8; 8],
     }
 
     #[derive(Debug, Clone)]
@@ -41,7 +55,7 @@ pub mod pmx_types {
         pub s_material_index: u8,
         pub s_bone_index: u8,
         pub s_morph_index: u8,
-        pub s_solid_index: u8,
+        pub s_rigid_body_index: u8,
     }
 
     pub enum IndexSize {
@@ -147,34 +161,48 @@ pub mod pmx_types {
         pub  materials: Vec<PMXMaterial>
     }
 
+    pub(crate) enum ReaderStage {
+        Header,
+        ModelInfo,
+        VertexList,
+        TextureList,
+        SurfaceList,
+        MaterialList,
+        BoneList,
+        MorphList,
+        FrameList,
+        RigidList,
+        JointList,
+    }
+
     #[derive(Debug)]
     pub struct PMXBone {
-        name: String,
-        english_name: String,
-        position: Vec3,
-        parent: i32,
-        deform_depth: i32,
-        boneflag: u16,
-        offset: Vec3,
-        child: i32,
-        append_bone_index: i32,
-        append_weight: f32,
-        fixed_axis: Vec3,
-        local_axis_x: Vec3,
-        local_axis_z: Vec3,
-        key_value: i32,
-        ik_target_index: i32,
-        ik_iter_count: i32,
-        ik_limit: f32,
-        ik_links: Vec<PMXIKLink>,
+        pub(crate) name: String,
+        pub(crate) english_name: String,
+        pub(crate) position: Vec3,
+        pub(crate) parent: i32,
+        pub(crate) deform_depth: i32,
+        pub(crate) boneflag: u16,
+        pub(crate) offset: Vec3,
+        pub(crate) child: i32,
+        pub(crate) append_bone_index: i32,
+        pub(crate) append_weight: f32,
+        pub(crate) fixed_axis: Vec3,
+        pub(crate) local_axis_x: Vec3,
+        pub(crate) local_axis_z: Vec3,
+        pub(crate) key_value: i32,
+        pub(crate) ik_target_index: i32,
+        pub(crate) ik_iter_count: i32,
+        pub(crate) ik_limit: f32,
+        pub(crate) ik_links: Vec<PMXIKLink>,
     }
 
     #[derive(Debug)]
     pub struct PMXIKLink {
-        ik_bone_index: i32,
-        enable_limit: u8,
-        limit_min: Vec3,
-        limit_max: Vec3,
+        pub(crate) ik_bone_index: i32,
+        pub(crate) enable_limit: u8,
+        pub(crate) limit_min: Vec3,
+        pub(crate) limit_max: Vec3,
     }
 
     pub struct PMXMorph {
@@ -187,7 +215,11 @@ pub mod pmx_types {
     }
 
     pub struct PMXVertices {
-        pub vertices: Vec<PMXVertex>
+        pub(crate) vertices: Vec<PMXVertex>
+    }
+
+    pub struct PMXBones {
+        pub(crate) bones: Vec<PMXBone>
     }
 
     impl Display for PMXVertices {

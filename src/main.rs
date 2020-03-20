@@ -9,8 +9,14 @@ fn main() {
     let mut loader = PMXLoader::open(filename);
     let header = loader.get_header();
     println!("{:#?}", header);
-    let model_info = loader.read_pmx_model_info();
+    let model_info = loader.read_pmx_model_info().unwrap();
     print!("{:#?}", model_info);
-    let vertices = loader.read_pmx_vertices();
+    let vertices = loader.read_pmx_vertices().unwrap();
     print!("{}", vertices);
+    let faces = loader.read_pmx_faces().unwrap();
+    println!("{}", faces);
+    let textures = loader.read_texture_list().unwrap();
+    println!("{}", textures);
+    let materials = loader.read_pmx_materials();
+    println!("{:#?}", materials);
 }

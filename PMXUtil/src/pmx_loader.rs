@@ -1,8 +1,9 @@
 pub mod pmx_loader {
+    use std::io::Read;
     use std::path::Path;
 
     use crate::binary_reader::BinaryReader;
-    use crate::pmx_types::pmx_types::{Encode, PMXFace, PMXFaces, PMXHeaderC, PMXHeaderRust, PMXMaterial, PMXMaterials, PMXModelInfo, PMXSphereMode, PMXTextureList, PMXToonMode, PMXVertex, PMXVertexWeight, PMXVertices};
+    use crate::pmx_types::pmx_types::{BONE_FLAG_APPEND_ROTATE_MASK, BONE_FLAG_APPEND_TRANSLATE_MASK, BONE_FLAG_DEFORM_OUTER_PARENT_MASK, BONE_FLAG_FIXED_AXIS_MASK, BONE_FLAG_IK_MASK, BONE_FLAG_LOCAL_AXIS_MASK, BONE_FLAG_TARGET_SHOW_MODE_MASK, Encode, PMXBone, PMXBones, PMXFace, PMXFaces, PMXHeaderC, PMXHeaderRust, PMXIKLink, PMXMaterial, PMXMaterials, PMXModelInfo, PMXSphereMode, PMXTextureList, PMXToonMode, PMXVertex, PMXVertexWeight, PMXVertices, ReaderStage};
 
     pub fn transform_header_c2r(header: PMXHeaderC) -> PMXHeaderRust {
         let mut ctx = PMXHeaderRust {
@@ -16,7 +17,7 @@ pub mod pmx_loader {
             s_material_index: 0,
             s_bone_index: 0,
             s_morph_index: 0,
-            s_solid_index: 0,
+            s_rigid_body_index: 0,
         };
         ctx.magic = String::from_utf8_lossy(&header.magic).to_string();
         ctx.version = header.version;
@@ -32,13 +33,14 @@ pub mod pmx_loader {
         ctx.s_material_index = header.config[4];
         ctx.s_bone_index = header.config[5];
         ctx.s_morph_index = header.config[6];
-        ctx.s_solid_index = header.config[7];
+        ctx.s_rigid_body_index = header.config[7];
         ctx
     }
 
     pub struct PMXLoader {
         header: PMXHeaderRust,
         inner: BinaryReader,
+        stage: ReaderStage,
     }
 
     impl PMXLoader {
@@ -46,7 +48,7 @@ pub mod pmx_loader {
             let mut inner = BinaryReader::open(path).unwrap();
             let header = inner.read_PMXHeader_raw();
             let header_rs = transform_header_c2r(header);
-            PMXLoader { header: header_rs, inner }
+            PMXLoader { header: header_rs, inner, stage: ReaderStage::Header }
         }
         pub fn get_header(&self) -> PMXHeaderRust {
             PMXHeaderRust {
@@ -60,44 +62,64 @@ pub mod pmx_loader {
                 s_material_index: self.header.s_material_index,
                 s_bone_index: self.header.s_bone_index,
                 s_morph_index: self.header.s_morph_index,
-                s_solid_index: self.header.s_solid_index,
+                s_rigid_body_index: self.header.s_rigid_body_index,
             }
         }
-        pub fn read_pmx_model_info(&mut self) -> PMXModelInfo {
-            let mut ctx = PMXModelInfo {
-                name: "".to_string(),
-                name_en: "".to_string(),
-                comment: "".to_string(),
-                comment_en: "".to_string(),
-            };
-            let enc = self.header.encode;
-            ctx.name = self.inner.read_text_buf(enc);
-            ctx.name_en = self.inner.read_text_buf(enc);
-            ctx.comment = self.inner.read_text_buf(enc);
-            ctx.comment_en = self.inner.read_text_buf(enc);
-            ctx
-        }
-        pub fn read_texture_list(&mut self) -> PMXTextureList {
-            let textures = self.inner.read_i32();
-            let mut v = vec![];
-            for _ in 0..textures {
-                v.push(self.inner.read_text_buf(self.header.encode));
+        pub fn read_pmx_model_info(&mut self) -> Result<PMXModelInfo, ()> {
+            match self.stage {
+                ReaderStage::Header => {
+                    let mut ctx = PMXModelInfo {
+                        name: "".to_string(),
+                        name_en: "".to_string(),
+                        comment: "".to_string(),
+                        comment_en: "".to_string(),
+                    };
+                    let enc = self.header.encode;
+                    ctx.name = self.inner.read_text_buf(enc);
+                    ctx.name_en = self.inner.read_text_buf(enc);
+                    ctx.comment = self.inner.read_text_buf(enc);
+                    ctx.comment_en = self.inner.read_text_buf(enc);
+                    self.stage = ReaderStage::ModelInfo;
+                    Ok(ctx)
+                }
+                _ => { Err(()) }
             }
-            PMXTextureList { textures: v }
+        }
+        pub fn read_texture_list(&mut self) -> Result<PMXTextureList, ()> {
+            match self.stage {
+                ReaderStage::SurfaceList => {
+                    let textures = self.inner.read_i32();
+                    let mut v = vec![];
+                    for _ in 0..textures {
+                        v.push(self.inner.read_text_buf(self.header.encode));
+                    }
+                    self.stage = ReaderStage::TextureList;
+                    Ok(PMXTextureList { textures: v })
+                }
+                _ => {
+                    Err(())
+                }
+            }
         }
 
-        pub fn read_pmx_vertices(&mut self) -> PMXVertices {
-            let mut ctx = PMXVertices { vertices: vec![] };
-            let verts = self.inner.read_i32();
-            let mut v = Vec::with_capacity(verts as usize);
-            for _ in 0..verts {
-                v.push(self.read_pmx_vertex());
+        pub fn read_pmx_vertices(&mut self) -> Result<PMXVertices, ()> {
+            match self.stage {
+                ReaderStage::ModelInfo => {
+                    let mut ctx = PMXVertices { vertices: vec![] };
+                    let verts = self.inner.read_i32();
+                    let mut v = Vec::with_capacity(verts as usize);
+                    for _ in 0..verts {
+                        v.push(self.read_pmx_vertex());
+                    }
+                    assert_eq!(verts as usize, v.len());
+                    ctx.vertices = v;
+                    self.stage = ReaderStage::VertexList;
+                    Ok(ctx)
+                }
+                _ => { Err(()) }
             }
-            assert_eq!(verts as usize, v.len());
-            ctx.vertices = v;
-            ctx
         }
-        pub fn read_pmx_vertex(&mut self) -> PMXVertex {
+        fn read_pmx_vertex(&mut self) -> PMXVertex {
             let mut ctx = PMXVertex {
                 position: [0.0f32; 3],
                 norm: [0.0f32; 3],
@@ -183,32 +205,45 @@ pub mod pmx_loader {
             ctx.edge_mag = self.inner.read_f32();
             ctx
         }
-        pub fn read_pmx_faces(&mut self) -> PMXFaces {
-            let mut ctx = PMXFaces { faces: vec![] };
-            let faces = self.inner.read_i32();
-            let s_vertex_index = self.header.s_vertex_index;
-            println!("{}", faces);
-            let faces = faces / 3;
-            for _ in 0..faces {
-                let v0 = self.inner.read_vertex_index(s_vertex_index).unwrap();
-                let v1 = self.inner.read_vertex_index(s_vertex_index).unwrap();
-                let v2 = self.inner.read_vertex_index(s_vertex_index).unwrap();
-                ctx.faces.push(PMXFace { vertices: [v0, v1, v2] });
+        pub fn read_pmx_faces(&mut self) -> Result<PMXFaces, ()> {
+            match self.stage {
+                ReaderStage::VertexList => {
+                    let mut ctx = PMXFaces { faces: vec![] };
+                    let faces = self.inner.read_i32();
+                    let s_vertex_index = self.header.s_vertex_index;
+                    println!("{}", faces);
+                    let mut faces = faces / 3;
+                    for _ in 0..faces {
+                        let v0 = self.inner.read_vertex_index(s_vertex_index).unwrap();
+                        let v1 = self.inner.read_vertex_index(s_vertex_index).unwrap();
+                        let v2 = self.inner.read_vertex_index(s_vertex_index).unwrap();
+                        ctx.faces.push(PMXFace { vertices: [v0, v1, v2] });
+                    }
+                    assert_eq!(ctx.faces.len(), faces as usize);
+                    self.stage = ReaderStage::SurfaceList;
+                    Ok(ctx)
+                }
+                _ => { Err(()) }
             }
-            assert_eq!(ctx.faces.len(), faces as usize);
-            ctx
         }
-        pub fn read_pmx_materials(&mut self) -> PMXMaterials {
-            let mut ctx = PMXMaterials { materials: vec![] };
-            let counts = self.inner.read_i32();
-            for _ in 0..counts {
-                let material = self.read_pmx_material();
-                println!("{:#?}", material);
-                ctx.materials.push(material);
+        pub fn read_pmx_materials(&mut self) -> Result<PMXMaterials, ()> {
+            match self.stage {
+                ReaderStage::TextureList => {
+                    let mut ctx = PMXMaterials { materials: vec![] };
+                    let counts = self.inner.read_i32();
+                    println!("{}", counts);
+                    for _ in 0..counts {
+                        let material = self.read_pmx_material();
+                        println!("{:#?}", material);
+                        ctx.materials.push(material);
+                    }
+                    self.stage = ReaderStage::MaterialList;
+                    Ok(ctx)
+                }
+                _ => { Err(()) }
             }
-            ctx
         }
-        pub fn read_pmx_material(&mut self) -> PMXMaterial {
+        fn read_pmx_material(&mut self) -> PMXMaterial {
             let s_texture_index = self.header.s_texture_index;
             let mut ctx = PMXMaterial {
                 name: "".to_string(),
@@ -267,6 +302,96 @@ pub mod pmx_loader {
             };
             ctx.memo = self.inner.read_text_buf(self.header.encode);
             ctx.num_face_vertices = self.inner.read_i32();
+            ctx
+        }
+        pub fn read_pmx_bones(&mut self) -> PMXBones {
+            let mut ctx = PMXBones { bones: vec![] };
+            let count = self.inner.read_i32();
+            let mut v = Vec::with_capacity(count as usize);
+            for _ in 0..count {
+                v.push(self.read_pmx_bone());
+            }
+            ctx.bones = v;
+            ctx
+        }
+        fn read_pmx_bone(&mut self) -> PMXBone {
+            let encode = self.header.encode;
+            let s_bone_index = self.header.s_bone_index;
+            let mut ctx = PMXBone {
+                name: "".to_string(),
+                english_name: "".to_string(),
+                position: [0.0f32; 3],
+                parent: 0,
+                deform_depth: 0,
+                boneflag: 0,
+                offset: [0.0f32; 3],
+                child: 0,
+                append_bone_index: 0,
+                append_weight: 0.0,
+                fixed_axis: [0.0f32; 3],
+                local_axis_x: [0.0f32; 3],
+                local_axis_z: [0.0f32; 3],
+                key_value: 0,
+                ik_target_index: 0,
+                ik_iter_count: 0,
+                ik_limit: 0.0,
+                ik_links: vec![],
+            };
+            ctx.name = self.inner.read_text_buf(encode);
+            ctx.english_name = self.inner.read_text_buf(encode);
+            ctx.position = self.inner.read_vec3();
+            ctx.parent = self.inner.read_sized(s_bone_index).unwrap();
+            ctx.deform_depth = self.inner.read_i32();
+            ctx.boneflag = self.inner.read_u16();
+            //
+            if (ctx.boneflag & BONE_FLAG_TARGET_SHOW_MODE_MASK) > 0 {
+                ctx.child = self.inner.read_sized(s_bone_index).unwrap();
+            } else {
+                ctx.offset = self.inner.read_vec3();
+            }
+            //Append rotate or Append translate
+            if ctx.boneflag & (BONE_FLAG_APPEND_ROTATE_MASK | BONE_FLAG_APPEND_TRANSLATE_MASK) > 0 {
+                ctx.append_bone_index = self.inner.read_sized(s_bone_index).unwrap();
+                ctx.append_weight = self.inner.read_f32();
+            }
+            //Fixed Axis
+            if ctx.boneflag & BONE_FLAG_FIXED_AXIS_MASK > 0 {
+                ctx.fixed_axis = self.inner.read_vec3();
+            }
+            //Local Axis
+            if ctx.boneflag & BONE_FLAG_LOCAL_AXIS_MASK > 0 {
+                ctx.local_axis_x = self.inner.read_vec3();
+                ctx.local_axis_z = self.inner.read_vec3();
+            }
+            //outer deform
+            if ctx.boneflag & BONE_FLAG_DEFORM_OUTER_PARENT_MASK > 0 {
+                ctx.key_value = self.inner.read_i32();
+            }
+            //IK flag on
+            if ctx.boneflag & BONE_FLAG_IK_MASK > 0 {
+                ctx.ik_target_index = self.inner.read_sized(s_bone_index).unwrap();
+                ctx.ik_iter_count = self.inner.read_i32();
+                ctx.ik_limit = self.inner.read_f32();
+                let ik_link_count = self.inner.read_i32();
+                let mut ik_s = Vec::with_capacity(ik_link_count as usize);
+                for _ in 0..ik_link_count {
+                    ik_s.push(self.read_iklink());
+                }
+                ctx.ik_links = ik_s;
+            }
+            ctx
+        }
+        fn read_iklink(&mut self) -> PMXIKLink {
+            let mut ctx = PMXIKLink {
+                ik_bone_index: 0,
+                enable_limit: 0,
+                limit_min: [0.0f32; 3],
+                limit_max: [0.0f32; 3],
+            };
+            ctx.ik_bone_index = self.inner.read_sized(self.header.s_bone_index).unwrap();
+            ctx.enable_limit = self.inner.read_u8();
+            ctx.limit_min = self.inner.read_vec3();
+            ctx.limit_max = self.inner.read_vec3();
             ctx
         }
     }
