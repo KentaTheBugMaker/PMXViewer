@@ -10,12 +10,12 @@
   3. Parse Vertices Information
   4. Parse Material Information
   5. Parse Bone Information
+  6. Parse Morph Information
 ### WIP
   1. Implement Display trait
-  2. Parse Morph Information
-  3. Parse RigidBody Information
-  4. Parse Joint
-  5. Parse SoftBody
+  2. Parse RigidBody Information
+  3. Parse Joint
+  4. Parse SoftBody
 ### How to Use
 1. Import
 ```

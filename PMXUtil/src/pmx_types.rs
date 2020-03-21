@@ -210,13 +210,72 @@ pub mod pmx_types {
         pub(crate) limit_max: Vec3,
     }
 
+    #[derive(Debug)]
     pub struct PMXMorph {
-        name: String,
-        english_name: String,
-        category: u8,
-        morph_type: u8,
-        offset: i32,
+        pub(crate) name: String,
+        pub(crate) english_name: String,
+        pub(crate) category: u8,
+        pub(crate) morph_type: u8,
+        pub(crate) offset: i32,
+        pub(crate) morph_data: Vec<MorphTypes>,
+    }
 
+    #[derive(Debug)]
+    pub enum MorphTypes {
+        Vertex(VertexMorph),
+        UV(UVMorph),
+        UV1(UVMorph),
+        UV2(UVMorph),
+        UV3(UVMorph),
+        UV4(UVMorph),
+        Bone(BoneMorph),
+        Material(MaterialMorph),
+        Group(GroupMorph),
+    }
+
+    #[derive(Debug)]
+    pub struct VertexMorph {
+        pub(crate)  index: i32,
+        pub(crate)  offset: Vec3,
+    }
+
+    #[derive(Debug)]
+    pub struct UVMorph {
+        pub(crate) index: i32,
+        pub(crate) offset: Vec4,
+    }
+
+    #[derive(Debug)]
+    pub struct GroupMorph {
+        pub(crate) index: i32,
+        pub(crate) morph_factor: f32,
+    }
+
+    #[derive(Debug)]
+    pub struct BoneMorph {
+        pub(crate) index: i32,
+        pub(crate) translates: Vec3,
+        pub(crate) rotates: Vec4,
+    }
+
+    #[derive(Debug)]
+    pub struct MaterialMorph {
+        pub(crate) index: i32,
+        pub(crate) formula: u8,
+        pub(crate) diffuse: Vec4,
+        pub(crate) specular: Vec3,
+        pub(crate) specular_factor: f32,
+        pub(crate) ambient: Vec3,
+        pub(crate) edge_color: Vec4,
+        pub(crate) edge_size: f32,
+        pub(crate) texture_factor: Vec4,
+        pub(crate) sphere_texture_factor: Vec4,
+        pub(crate) toon_texture_factor: Vec4,
+    }
+
+    #[derive(Debug)]
+    pub struct PMXMorphs {
+        pub(crate) morphs: Vec<PMXMorph>
     }
 
     pub struct PMXVertices {

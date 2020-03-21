@@ -10,7 +10,7 @@ use crate::pmx_types::pmx_types::{Encode, PMXHeaderC, Vec2, Vec3, Vec4};
 use self::encoding::{DecoderTrap, Encoding};
 
 pub struct BinaryReader {
-    inner:BufReader<File>
+    inner: BufReader<File>
 }
 
 impl BinaryReader {
@@ -20,7 +20,7 @@ impl BinaryReader {
 
         match file {
             Ok(file) => {
-                let inner=BufReader::with_capacity(file_size as usize,file);
+                let inner = BufReader::with_capacity(file_size as usize, file);
                 Ok(BinaryReader {
                     inner
                 })

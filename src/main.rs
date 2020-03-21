@@ -20,5 +20,7 @@ fn main() {
     let materials = loader.read_pmx_materials().unwrap();
     // println!("{:#?}", materials);
     let bones = loader.read_pmx_bones().unwrap();
-    println!("{:#?}", bones)
+    println!("{:#?}", bones);
+    let morphs = loader.read_pmx_morphs().unwrap();
+    println!("{:#?}", morphs);
 }

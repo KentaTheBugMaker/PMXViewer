@@ -2,7 +2,8 @@ pub mod pmx_loader {
     use std::path::Path;
 
     use crate::binary_reader::BinaryReader;
-    use crate::pmx_types::pmx_types::{BONE_FLAG_APPEND_ROTATE_MASK, BONE_FLAG_APPEND_TRANSLATE_MASK, BONE_FLAG_DEFORM_OUTER_PARENT_MASK, BONE_FLAG_FIXED_AXIS_MASK, BONE_FLAG_IK_MASK, BONE_FLAG_LOCAL_AXIS_MASK, BONE_FLAG_TARGET_SHOW_MODE_MASK, Encode, PMXBone, PMXBones, PMXFace, PMXFaces, PMXHeaderC, PMXHeaderRust, PMXIKLink, PMXMaterial, PMXMaterials, PMXModelInfo, PMXSphereMode, PMXTextureList, PMXToonMode, PMXVertex, PMXVertexWeight, PMXVertices, ReaderStage};
+    use crate::pmx_types::pmx_types::{BONE_FLAG_APPEND_ROTATE_MASK, BONE_FLAG_APPEND_TRANSLATE_MASK, BONE_FLAG_DEFORM_OUTER_PARENT_MASK, BONE_FLAG_FIXED_AXIS_MASK, BONE_FLAG_IK_MASK, BONE_FLAG_LOCAL_AXIS_MASK, BONE_FLAG_TARGET_SHOW_MODE_MASK, BoneMorph, Encode, GroupMorph, MaterialMorph, MorphTypes, PMXBone, PMXBones, PMXFace, PMXFaces, PMXHeaderC, PMXHeaderRust, PMXIKLink, PMXMaterial, PMXMaterials, PMXModelInfo, PMXMorph, PMXMorphs, PMXSphereMode, PMXTextureList, PMXToonMode, PMXVertex, PMXVertexWeight, PMXVertices, ReaderStage, UVMorph, VertexMorph};
+    use crate::pmx_types::pmx_types::PMXDrawModeFlags::GroundShadow;
 
     pub fn transform_header_c2r(header: PMXHeaderC) -> PMXHeaderRust {
         let mut ctx = PMXHeaderRust {
@@ -307,7 +308,7 @@ pub mod pmx_loader {
                     let count = self.inner.read_i32();
                     let mut v = Vec::with_capacity(count as usize);
                     for _ in 0..count {
-                        let bone=self.read_pmx_bone();
+                        let bone = self.read_pmx_bone();
                         v.push(bone);
                     }
                     ctx.bones = v;
@@ -318,6 +319,136 @@ pub mod pmx_loader {
                     Err(())
                 }
             }
+        }
+        pub fn read_pmx_morphs(&mut self) -> Result<PMXMorphs, ()> {
+            match self.stage {
+                ReaderStage::BoneList => {
+                    let mut ctx = PMXMorphs { morphs: vec![] };
+                    let count = self.inner.read_i32();
+                    let mut v = Vec::with_capacity(count as usize);
+                    for _ in 0..count {
+                        let bone = self.read_pmx_morph();
+                        v.push(bone);
+                    }
+                    ctx.morphs = v;
+                    self.stage = ReaderStage::MorphList;
+                    Ok(ctx)
+                }
+                _ => {
+                    Err(())
+                }
+            }
+        }
+        fn read_pmx_morph(&mut self) -> PMXMorph {
+            let mut ctx = PMXMorph {
+                name: "".to_string(),
+                english_name: "".to_string(),
+                category: 0,
+                morph_type: 0,
+                offset: 0,
+                morph_data: vec![],
+            };
+            let encode = self.header.encode;
+            ctx.name = self.inner.read_text_buf(encode);
+            ctx.english_name = self.inner.read_text_buf(encode);
+            ctx.category = self.inner.read_u8();
+            ctx.morph_type = self.inner.read_u8();
+            ctx.offset = self.inner.read_i32();
+            let mut v = vec![];
+            for _ in 0..ctx.offset {
+                let morph = match ctx.morph_type {
+                    0 => {
+                        MorphTypes::Group(self.read_group_morph())
+                    }
+                    1 => {
+                        MorphTypes::Vertex(self.read_vertex_morph())
+                    }
+                    2 => {
+                        MorphTypes::Bone(self.read_bone_morph())
+                    }
+                    3 => {
+                        MorphTypes::UV(self.read_uv_morph())
+                    }
+                    4 => {
+                        MorphTypes::UV1(self.read_uv_morph())
+                    }
+                    5 => {
+                        MorphTypes::UV2(self.read_uv_morph())
+                    }
+                    6 => {
+                        MorphTypes::UV3(self.read_uv_morph())
+                    }
+                    7 => {
+                        MorphTypes::UV4(self.read_uv_morph())
+                    }
+                    8 => {
+                        MorphTypes::Material(self.read_material_morph())
+                    }
+                    _ => {
+                        panic!("Unexpected morph type:{}", ctx.morph_type)
+                    }
+                };
+                v.push(morph);
+            }
+            ctx.morph_data = v;
+            ctx
+        }
+        fn read_vertex_morph(&mut self) -> VertexMorph {
+            let mut ctx = VertexMorph { index: 0, offset: [0.0f32; 3] };
+            ctx.index = self.inner.read_sized(self.header.s_vertex_index).unwrap();
+            ctx.offset = self.inner.read_vec3();
+            ctx
+        }
+        fn read_uv_morph(&mut self) -> UVMorph {
+            let mut ctx = UVMorph { index: 0, offset: [0.0f32; 4] };
+            ctx.index = self.inner.read_sized(self.header.s_vertex_index).unwrap();
+            ctx.offset = self.inner.read_vec4();
+            ctx
+        }
+        fn read_bone_morph(&mut self) -> BoneMorph {
+            let mut ctx = BoneMorph {
+                index: 0,
+                translates: [0.0f32; 3],
+                rotates: [0.0f32; 4],
+            };
+            ctx.index = self.inner.read_sized(self.header.s_bone_index).unwrap();
+            ctx.translates = self.inner.read_vec3();
+            ctx.rotates = self.inner.read_vec4();
+            ctx
+        }
+        fn read_material_morph(&mut self) -> MaterialMorph {
+            let mut ctx = MaterialMorph {
+                index: 0,
+                formula: 0,
+                diffuse: [0.0f32; 4],
+                specular: [0.0f32; 3],
+                specular_factor: 0.0,
+                ambient: [0.0f32; 3],
+                edge_color: [0.0f32; 4],
+                edge_size: 0.0,
+                texture_factor: [0.0f32; 4],
+                sphere_texture_factor: [0.0f32; 4],
+                toon_texture_factor: [0.0f32; 4],
+            };
+            ctx.index = self.inner.read_sized(self.header.s_material_index).unwrap();
+            ctx.formula = self.inner.read_u8();
+            ctx.diffuse = self.inner.read_vec4();
+            ctx.specular = self.inner.read_vec3();
+            ctx.specular_factor = self.inner.read_f32();
+            ctx.ambient = self.inner.read_vec3();
+            ctx.edge_color = self.inner.read_vec4();
+            ctx.edge_size = self.inner.read_f32();
+            ctx.texture_factor = self.inner.read_vec4();
+            ctx.sphere_texture_factor = self.inner.read_vec4();
+            ctx.toon_texture_factor = self.inner.read_vec4();
+            ctx
+        }
+        fn read_group_morph(&mut self) -> GroupMorph {
+            let mut ctx = GroupMorph { index: 0, morph_factor: 0.0 };
+            let size = self.header.s_morph_index;
+            ctx.index = self.inner.read_sized(size).unwrap();
+            ctx.morph_factor = self.inner.read_f32();
+            ctx
         }
         fn read_pmx_bone(&mut self) -> PMXBone {
             let encode = self.header.encode;
@@ -364,7 +495,7 @@ pub mod pmx_loader {
                 ctx.fixed_axis = self.inner.read_vec3();
             }
             //Local Axis
-            if (ctx.boneflag & BONE_FLAG_LOCAL_AXIS_MASK) ==BONE_FLAG_LOCAL_AXIS_MASK {
+            if (ctx.boneflag & BONE_FLAG_LOCAL_AXIS_MASK) == BONE_FLAG_LOCAL_AXIS_MASK {
                 ctx.local_axis_x = self.inner.read_vec3();
                 ctx.local_axis_z = self.inner.read_vec3();
             }
@@ -373,7 +504,7 @@ pub mod pmx_loader {
                 ctx.key_value = self.inner.read_i32();
             }
             //IK flag on
-            if (ctx.boneflag & BONE_FLAG_IK_MASK) ==BONE_FLAG_IK_MASK {
+            if (ctx.boneflag & BONE_FLAG_IK_MASK) == BONE_FLAG_IK_MASK {
                 ctx.ik_target_index = self.inner.read_sized(s_bone_index).unwrap();
                 ctx.ik_iter_count = self.inner.read_i32();
                 ctx.ik_limit = self.inner.read_f32();
@@ -383,7 +514,7 @@ pub mod pmx_loader {
                     ik_s.push(self.read_iklink());
                 }
                 ctx.ik_links = ik_s;
-                assert_eq!(ctx.ik_links.len(),ik_link_count as usize);
+                assert_eq!(ctx.ik_links.len(), ik_link_count as usize);
             }
             ctx
         }
@@ -396,11 +527,11 @@ pub mod pmx_loader {
             };
             ctx.ik_bone_index = self.inner.read_sized(self.header.s_bone_index).unwrap();
             ctx.enable_limit = self.inner.read_u8();
-            if ctx.enable_limit==1 {
+            if ctx.enable_limit == 1 {
                 ctx.limit_min = self.inner.read_vec3();
                 ctx.limit_max = self.inner.read_vec3();
             }
-                ctx
+            ctx
         }
     }
 }
