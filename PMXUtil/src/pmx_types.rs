@@ -1,5 +1,5 @@
 pub mod pmx_types {
-    use std::fmt::{Display, Error, Formatter};
+    use std::fmt::{Display, Formatter};
 
     pub type Vec2 = [f32; 2];
     pub type Vec3 = [f32; 3];
@@ -14,14 +14,19 @@ pub mod pmx_types {
     /*Bone Flag*/
     pub const BONE_FLAG_TARGET_SHOW_MODE_MASK: u16 = 0x0001;
     pub const BONE_FLAG_ALLOW_ROTATE_MASK: u16 = 0x0002;
+    //0b 0000 0000 0000 0010
     pub const BONE_FLAG_ALLOW_TRANSLATE_MASK: u16 = 0x0004;
+    //0b 0000 0000 0000 0100
     pub const BONE_FLAG_VISIBLE_MASK: u16 = 0x0008;
     pub const BONE_FLAG_ALLOW_CONTROL_MASK: u16 = 0x0010;
     pub const BONE_FLAG_IK_MASK: u16 = 0x0020;
     pub const BONE_FLAG_APPEND_LOCAL_MASK: u16 = 0x0080;
     pub const BONE_FLAG_APPEND_ROTATE_MASK: u16 = 0x0100;
+    //0b 0000 0001 0000 0000
     pub const BONE_FLAG_APPEND_TRANSLATE_MASK: u16 = 0x0200;
+    //0b 0000 0010 0000 0000
     pub const BONE_FLAG_FIXED_AXIS_MASK: u16 = 0x0400;
+    //0b 0000 0100 0000 0000
     pub const BONE_FLAG_LOCAL_AXIS_MASK: u16 = 0x0800;
     pub const BONE_FLAG_DEFORM_AFTER_PHYSICS_MASK: u16 = 0x1000;
     pub const BONE_FLAG_DEFORM_OUTER_PARENT_MASK: u16 = 0x2000;
@@ -218,6 +223,7 @@ pub mod pmx_types {
         pub(crate) vertices: Vec<PMXVertex>
     }
 
+    #[derive(Debug)]
     pub struct PMXBones {
         pub(crate) bones: Vec<PMXBone>
     }

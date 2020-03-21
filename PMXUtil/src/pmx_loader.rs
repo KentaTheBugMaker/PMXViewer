@@ -1,5 +1,4 @@
 pub mod pmx_loader {
-    use std::io::Read;
     use std::path::Path;
 
     use crate::binary_reader::BinaryReader;
@@ -211,8 +210,7 @@ pub mod pmx_loader {
                     let mut ctx = PMXFaces { faces: vec![] };
                     let faces = self.inner.read_i32();
                     let s_vertex_index = self.header.s_vertex_index;
-                    println!("{}", faces);
-                    let mut faces = faces / 3;
+                    let faces = faces / 3;
                     for _ in 0..faces {
                         let v0 = self.inner.read_vertex_index(s_vertex_index).unwrap();
                         let v1 = self.inner.read_vertex_index(s_vertex_index).unwrap();
@@ -231,10 +229,8 @@ pub mod pmx_loader {
                 ReaderStage::TextureList => {
                     let mut ctx = PMXMaterials { materials: vec![] };
                     let counts = self.inner.read_i32();
-                    println!("{}", counts);
                     for _ in 0..counts {
                         let material = self.read_pmx_material();
-                        println!("{:#?}", material);
                         ctx.materials.push(material);
                     }
                     self.stage = ReaderStage::MaterialList;
@@ -304,15 +300,24 @@ pub mod pmx_loader {
             ctx.num_face_vertices = self.inner.read_i32();
             ctx
         }
-        pub fn read_pmx_bones(&mut self) -> PMXBones {
-            let mut ctx = PMXBones { bones: vec![] };
-            let count = self.inner.read_i32();
-            let mut v = Vec::with_capacity(count as usize);
-            for _ in 0..count {
-                v.push(self.read_pmx_bone());
+        pub fn read_pmx_bones(&mut self) -> Result<PMXBones, ()> {
+            match self.stage {
+                ReaderStage::MaterialList => {
+                    let mut ctx = PMXBones { bones: vec![] };
+                    let count = self.inner.read_i32();
+                    let mut v = Vec::with_capacity(count as usize);
+                    for _ in 0..count {
+                        let bone=self.read_pmx_bone();
+                        v.push(bone);
+                    }
+                    ctx.bones = v;
+                    self.stage = ReaderStage::BoneList;
+                    Ok(ctx)
+                }
+                _ => {
+                    Err(())
+                }
             }
-            ctx.bones = v;
-            ctx
         }
         fn read_pmx_bone(&mut self) -> PMXBone {
             let encode = self.header.encode;
@@ -344,7 +349,7 @@ pub mod pmx_loader {
             ctx.deform_depth = self.inner.read_i32();
             ctx.boneflag = self.inner.read_u16();
             //
-            if (ctx.boneflag & BONE_FLAG_TARGET_SHOW_MODE_MASK) > 0 {
+            if (ctx.boneflag & BONE_FLAG_TARGET_SHOW_MODE_MASK) == BONE_FLAG_TARGET_SHOW_MODE_MASK {
                 ctx.child = self.inner.read_sized(s_bone_index).unwrap();
             } else {
                 ctx.offset = self.inner.read_vec3();
@@ -355,20 +360,20 @@ pub mod pmx_loader {
                 ctx.append_weight = self.inner.read_f32();
             }
             //Fixed Axis
-            if ctx.boneflag & BONE_FLAG_FIXED_AXIS_MASK > 0 {
+            if (ctx.boneflag & BONE_FLAG_FIXED_AXIS_MASK) == BONE_FLAG_FIXED_AXIS_MASK {
                 ctx.fixed_axis = self.inner.read_vec3();
             }
             //Local Axis
-            if ctx.boneflag & BONE_FLAG_LOCAL_AXIS_MASK > 0 {
+            if (ctx.boneflag & BONE_FLAG_LOCAL_AXIS_MASK) ==BONE_FLAG_LOCAL_AXIS_MASK {
                 ctx.local_axis_x = self.inner.read_vec3();
                 ctx.local_axis_z = self.inner.read_vec3();
             }
             //outer deform
-            if ctx.boneflag & BONE_FLAG_DEFORM_OUTER_PARENT_MASK > 0 {
+            if (ctx.boneflag & BONE_FLAG_DEFORM_OUTER_PARENT_MASK) > 0 {
                 ctx.key_value = self.inner.read_i32();
             }
             //IK flag on
-            if ctx.boneflag & BONE_FLAG_IK_MASK > 0 {
+            if (ctx.boneflag & BONE_FLAG_IK_MASK) ==BONE_FLAG_IK_MASK {
                 ctx.ik_target_index = self.inner.read_sized(s_bone_index).unwrap();
                 ctx.ik_iter_count = self.inner.read_i32();
                 ctx.ik_limit = self.inner.read_f32();
@@ -378,6 +383,7 @@ pub mod pmx_loader {
                     ik_s.push(self.read_iklink());
                 }
                 ctx.ik_links = ik_s;
+                assert_eq!(ctx.ik_links.len(),ik_link_count as usize);
             }
             ctx
         }
@@ -390,9 +396,11 @@ pub mod pmx_loader {
             };
             ctx.ik_bone_index = self.inner.read_sized(self.header.s_bone_index).unwrap();
             ctx.enable_limit = self.inner.read_u8();
-            ctx.limit_min = self.inner.read_vec3();
-            ctx.limit_max = self.inner.read_vec3();
-            ctx
+            if ctx.enable_limit==1 {
+                ctx.limit_min = self.inner.read_vec3();
+                ctx.limit_max = self.inner.read_vec3();
+            }
+                ctx
         }
     }
 }
