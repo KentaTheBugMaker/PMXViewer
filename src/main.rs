@@ -6,7 +6,7 @@ use std::borrow::Borrow;
 use std::f32::consts::PI;
 use std::fs::File;
 use std::intrinsics::transmute;
-use std::io::BufReader;
+use std::io::{BufReader, Read};
 use std::ops::Deref;
 use std::rc::Rc;
 use std::time::Duration;
@@ -22,8 +22,13 @@ use image::ImageFormat::Png;
 use PMXUtil::pmx_loader::pmx_loader::PMXLoader;
 use PMXUtil::pmx_types::pmx_types::{PMXFaces, PMXMaterials, PMXTextureList, PMXVertex, PMXVertices};
 
+const platform: platform = platform::UNIX;
 mod support;
 
+enum platform {
+    UNIX,
+    WINDOWS,
+}
 #[derive(Copy, Clone)]
 pub struct GliumVertex {
     position: [f32; 3],
@@ -60,7 +65,7 @@ implement_vertex!(GliumVertex,position,norm,uv);
 
 fn draw(display: &Display, vertex_buffer: &VertexBuffer<GliumVertex>, textures: &Vec<Texture2d>, asset: &Vec<DrawAsset>, program: &Program, params: &DrawParameters, theta: f32) {
     let mut target = display.draw();
-    target.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.5);
+    target.clear_color_and_depth((0.0, 0.0, 1.0, 0.0), 1.0);
     for asset in asset {
         draw_DrawAsset(&mut target, vertex_buffer, textures, asset, program, params, theta);
     }
@@ -70,20 +75,84 @@ fn draw(display: &Display, vertex_buffer: &VertexBuffer<GliumVertex>, textures: 
 struct DrawAsset {
     ibo: Rc<IndexBuffer<u32>>,
     texture: usize,
+    diffuse: [f32; 4],
+    ambient: [f32; 3],
 }
 
+fn perspective(aspect_ratio: f32, fov: f32, zfar: f32, znear: f32) -> [[f32; 4]; 4] {
+    let f = 1.0 / (fov / 2.0).tan();
+    [[f * aspect_ratio, 0.0, 0.0, 0.0],
+        [0.0, f, 0.0, 0.0],
+        [0.0, 0.0, (zfar + znear) / (zfar - znear), 1.0],
+        [0.0, 0.0, -(2.0 * zfar * znear) / (zfar - znear), 0.0]]
+}
+
+fn translate(x: f32, y: f32, z: f32) -> [[f32; 4]; 4] {
+    [[1.0, 0.0, 0.0, x], [0.0, 1.0, 0.0, y], [0.0, 0.0, 0.0, z], [0.0, 0.0, 0.0, 1.0]]
+}
+
+fn rotate_y(theta: f32) -> [[f32; 4]; 4] {
+    let cos = theta.cos();
+    let sin = theta.sin();
+    [[cos, 0.0, sin, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [-sin, 0.0, cos, 0.0],
+        [0.0, 0.0, 0.0, 1.0]]
+}
+
+fn scale(x: f32, y: f32, z: f32) -> [[f32; 4]; 4] {
+    [[x, 0.0, 0.0, 0.0],
+        [0.0, y, 0.0, 0.0],
+        [0.0, 0.0, z, 0.0],
+        [0.0, 0.0, 0.0, 1.0]]
+}
+
+fn view_matrix(position: &[f32; 3], direction: &[f32; 3], up: &[f32; 3]) -> [[f32; 4]; 4] {
+    let f = {
+        let f = direction;
+        let len = f[0] * f[0] + f[1] * f[1] + f[2] * f[2];
+        let len = len.sqrt();
+        [f[0] / len, f[1] / len, f[2] / len]
+    };
+
+    let s = [up[1] * f[2] - up[2] * f[1],
+        up[2] * f[0] - up[0] * f[2],
+        up[0] * f[1] - up[1] * f[0]];
+
+    let s_norm = {
+        let len = s[0] * s[0] + s[1] * s[1] + s[2] * s[2];
+        let len = len.sqrt();
+        [s[0] / len, s[1] / len, s[2] / len]
+    };
+
+    let u = [f[1] * s_norm[2] - f[2] * s_norm[1],
+        f[2] * s_norm[0] - f[0] * s_norm[2],
+        f[0] * s_norm[1] - f[1] * s_norm[0]];
+
+    let p = [-position[0] * s_norm[0] - position[1] * s_norm[1] - position[2] * s_norm[2],
+        -position[0] * u[0] - position[1] * u[1] - position[2] * u[2],
+        -position[0] * f[0] - position[1] * f[1] - position[2] * f[2]];
+
+    [
+        [s_norm[0], u[0], f[0], 0.0],
+        [s_norm[1], u[1], f[1], 0.0],
+        [s_norm[2], u[2], f[2], 0.0],
+        [p[0], p[1], p[2], 1.0],
+    ]
+}
 fn draw_DrawAsset(frame: &mut Frame, vbo: &VertexBuffer<GliumVertex>, textures: &Vec<Texture2d>, asset: &DrawAsset, program: &Program, params: &DrawParameters, theta: f32) {
-    let cos = (PI * theta / 180.0).cos();
-    let sin = (PI * theta / 180.0).sin();
+    let identity = scale(0.05, 0.05, 0.05);
+    let model = translate(0.0, 0.5, 0.0);
     let uniforms = uniform! {
-            matrix: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 20.0f32]
-            ],
-            rotate:[[cos,0.0,-sin,0.0],[0.0,1.0,0.0,0.0],[sin,0.0,cos,0.0],[0.0,0.0,0.0,1.0]],
-            tex:&textures[asset.texture]
+            identity:identity,
+            model:model,
+            view:translate(0.0,0.0,-1.0),
+            projection:perspective(1.0,1.0,0.0,1.1),
+            rotate:rotate_y(theta),
+            tex:&textures[asset.texture],
+            diffuse:asset.diffuse,
+            ambient:asset.ambient,
+            wlightDir:[0.0,-1.0,0.0f32]
         };
     let ibo: &IndexBuffer<u32> = asset.ibo.borrow();
     frame.draw(vbo, ibo, program, &uniforms, params).unwrap()
@@ -98,7 +167,7 @@ fn Make_DrawAsset(display: &Display, faces: &mut PMXFaces, texture_list: PMXText
     let path = std::path::Path::new(&filename);
     let path = path.parent().unwrap().to_str().unwrap();
     for texture_name in texture_list.textures {
-        let path = (path.to_string() + "\\" + &texture_name);
+        let path = (path.to_string() + "/" + &texture_name.replace("\\", &std::path::MAIN_SEPARATOR.to_string()));
         println!("path:{}", path);
 
         let image = image::open(path).unwrap().to_rgba();
@@ -114,7 +183,7 @@ fn Make_DrawAsset(display: &Display, faces: &mut PMXFaces, texture_list: PMXText
         let faces = PMXFaces { faces: v };
         let ibo = convert_index_buffer(&display, &faces);
         let ti = material.texture_index as usize;
-        let asset = DrawAsset { ibo: Rc::new(ibo), texture: ti };
+        let asset = DrawAsset { ibo: Rc::new(ibo), texture: ti, diffuse: material.diffuse, ambient: material.ambient };
         out.push(asset);
     }
     (out, textures)
@@ -145,49 +214,21 @@ fn main() {
     // println!("{:#?}", bones);
     let morphs = loader.read_pmx_morphs().unwrap();
     // println!("{:#?}", morphs);
-    //Texture Load
-    let path = std::path::Path::new(&filename);
-    let path = path.parent().unwrap().to_str().unwrap();
-    let path = (path.to_string() + "\\" + &textures.textures[3]);
-    println!("path:{}", path);
-    let image = image::open(path).unwrap().to_rgba();
-    let dimensions = image.dimensions();
-    let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw(), dimensions);
-    let texture = glium::texture::Texture2d::new(&display, image).unwrap();
 
     let (draw_asset, texture_list) = Make_DrawAsset(&display, &mut faces, textures, materials, &filename);
+    let mut v_src = String::new();
+    std::fs::File::open("shaders/vertex_shader.glsl").unwrap().read_to_string(&mut v_src).unwrap();
+    let mut f_src = String::new();
+    std::fs::File::open("shaders/fragment_shader.glsl").unwrap().read_to_string(&mut f_src).unwrap();
 
-    let vertex_shader_src = r#"
-        #version 140
-        in vec3 position;
-        in vec2 uv;
-        out vec2 v_tex_coords;
-        uniform mat4 matrix;
-        uniform mat4 rotate;
-        void main() {
-            v_tex_coords =vec2( uv[0],1.0-uv[1]);
-            vec4 opos=  matrix*rotate*vec4( position.xyz, 1.0 );
-            //opos.z= -(2.0 * opos.z - opos.w);
-            gl_Position =opos;
-        }
-    "#;
 
-    let fragment_shader_src = r#"
-        #version 140
-        in vec2 v_tex_coords;
-        out vec4 color;
-        uniform sampler2D tex;
-        void main() {
-            color = texture(tex, v_tex_coords);
-        }
-    "#;
-
-    let params = glium::DrawParameters {
+    let mut params = glium::DrawParameters {
         depth: glium::Depth { test: glium::DepthTest::IfLessOrEqual, write: true, ..Default::default() },
         ..Default::default()
     };
-
-    let program = glium::Program::from_source(&display, vertex_shader_src, fragment_shader_src, None).unwrap();
+    params.backface_culling = glium::BackfaceCullingMode::CullCounterClockwise;
+    params.blend = glium::Blend::alpha_blending();
+    let program = glium::Program::from_source(&display, &v_src, &f_src, None).unwrap();
     draw(&display, &vertex_buffer, &texture_list, &draw_asset, &program, &params, 0.0);
 
 
@@ -200,9 +241,8 @@ fn main() {
                 glutin::event::WindowEvent::CloseRequested => glutin::event_loop::ControlFlow::Exit,
                 // Redraw the triangle when the window is resized.
                 glutin::event::WindowEvent::Resized(..) => {
-                    thread::sleep(Duration::from_secs_f32(0.1));
                     draw(&display, &vertex_buffer, &texture_list, &draw_asset, &program, &params, theta);
-                    theta += 15.0;
+                    theta += 0.01;
                     println!("theta:{}", theta);
                     glutin::event_loop::ControlFlow::Poll
                 },
