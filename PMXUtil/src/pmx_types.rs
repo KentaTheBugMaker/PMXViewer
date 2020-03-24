@@ -100,6 +100,7 @@ pub mod pmx_types {
         pub sdef_r1: Vec3,
         pub edge_mag: f32,
     }
+
     /*Represent Triangle*/
     pub struct PMXFace {
         pub vertices: [u32; 3]
@@ -279,7 +280,7 @@ pub mod pmx_types {
     }
 
     pub struct PMXVertices {
-        pub(crate) vertices: Vec<PMXVertex>
+        pub vertices: Vec<PMXVertex>
     }
 
     #[derive(Debug)]
