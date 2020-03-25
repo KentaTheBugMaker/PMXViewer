@@ -28,10 +28,10 @@ pub fn start_loop<F>(event_loop: EventLoop<()>, mut callback: F) -> ! where F: '
                 match cause {
                     StartCause::ResumeTimeReached { .. } | StartCause::Init => {
                         true
-                    },
+                    }
                     _ => false
                 }
-            },
+            }
             Some(event) => {
                 events_buffer.push(event);
                 false
@@ -39,7 +39,7 @@ pub fn start_loop<F>(event_loop: EventLoop<()>, mut callback: F) -> ! where F: '
             None => {
                 // Ignore this event.
                 false
-            },
+            }
         };
 
         let action = if run_callback {
@@ -55,7 +55,7 @@ pub fn start_loop<F>(event_loop: EventLoop<()>, mut callback: F) -> ! where F: '
         match action {
             Action::Continue => {
                 *control_flow = ControlFlow::WaitUntil(next_frame_time);
-            },
+            }
             Action::Stop => *control_flow = ControlFlow::Exit
         }
     })

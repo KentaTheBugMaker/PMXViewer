@@ -9,6 +9,7 @@ use std::intrinsics::transmute;
 use std::io::{BufReader, Read};
 use std::ops::Deref;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 #[macro_use]
@@ -23,12 +24,14 @@ use PMXUtil::pmx_loader::pmx_loader::PMXLoader;
 use PMXUtil::pmx_types::pmx_types::{PMXFaces, PMXMaterials, PMXTextureList, PMXVertex, PMXVertices};
 
 const platform: platform = platform::UNIX;
+
 mod support;
 
 enum platform {
     UNIX,
     WINDOWS,
 }
+
 #[derive(Copy, Clone)]
 pub struct GliumVertex {
     position: [f32; 3],
@@ -140,6 +143,7 @@ fn view_matrix(position: &[f32; 3], direction: &[f32; 3], up: &[f32; 3]) -> [[f3
         [p[0], p[1], p[2], 1.0],
     ]
 }
+
 fn draw_DrawAsset(frame: &mut Frame, vbo: &VertexBuffer<GliumVertex>, textures: &Vec<Texture2d>, asset: &DrawAsset, program: &Program, params: &DrawParameters, theta: f32) {
     let identity = scale(0.05, 0.05, 0.05);
     let model = translate(0.0, 0.5, 0.0);
@@ -230,25 +234,38 @@ fn main() {
     params.blend = glium::Blend::alpha_blending();
     let program = glium::Program::from_source(&display, &v_src, &f_src, None).unwrap();
     draw(&display, &vertex_buffer, &texture_list, &draw_asset, &program, &params, 0.0);
-
+    //Window refresh request sender
+    let proxy = Arc::new(Mutex::new(event_loop.create_proxy()));
+    thread::spawn(move || {
+        let proxy = proxy.clone();
+        loop {
+            proxy.lock().unwrap().send_event(());
+            thread::sleep(Duration::from_secs_f32(0.017));
+        }
+    });
 
     let mut theta = 0.0;
     // the main loop
     event_loop.run(move |event, _, control_flow| {
         *control_flow = match event {
-            glutin::event::Event::WindowEvent { event, .. } => match event {
-                // Break from the main loop when the window is closed.
-                glutin::event::WindowEvent::CloseRequested => glutin::event_loop::ControlFlow::Exit,
-                // Redraw the triangle when the window is resized.
-                glutin::event::WindowEvent::Resized(..) => {
-                    draw(&display, &vertex_buffer, &texture_list, &draw_asset, &program, &params, theta);
-                    theta += 0.01;
-                    println!("theta:{}", theta);
-                    glutin::event_loop::ControlFlow::Poll
-                },
-                _ => glutin::event_loop::ControlFlow::Poll,
-            },
-            _ => glutin::event_loop::ControlFlow::Poll,
+            glutin::event::Event::NewEvents(_) => { glutin::event_loop::ControlFlow::Poll }
+            glutin::event::Event::WindowEvent { event, .. } => {
+                match event {
+                    glutin::event::WindowEvent::Resized(physical_size) => {
+                        glutin::event_loop::ControlFlow::Poll
+                    }
+                    glutin::event::WindowEvent::CloseRequested => {
+                        glutin::event_loop::ControlFlow::Exit
+                    }
+                    _ => { glutin::event_loop::ControlFlow::Poll }
+                }
+            }
+            glutin::event::Event::UserEvent(_) => {
+                draw(&display, &vertex_buffer, &texture_list, &draw_asset, &program, &params, theta);
+                theta += 0.01;
+                glutin::event_loop::ControlFlow::Poll
+            }
+            _ => { glutin::event_loop::ControlFlow::Poll }
         };
     });
 }
