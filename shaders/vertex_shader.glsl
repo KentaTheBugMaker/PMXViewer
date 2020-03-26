@@ -1,29 +1,22 @@
-#version 140
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-uniform mat4 rotate;
-uniform vec4 diffuse;// マテリアルのdiffuseカラー
-uniform vec3 wlightDir;// ワールド座標のディレクショナルライトの向き
-uniform mat4 identity;
-in vec3 position;// 頂点データ
-in vec3 norm;// 法線データ
+#version 330 core
+uniform mat4 mvp;
+uniform mat4 depth_bias_mvp;
+uniform mat4 model_matrix;
+uniform mat4 view_matrix;
+uniform vec4 model_color;
+in vec4 position;
+in vec4 normal;
 in vec2 uv;
-uniform vec3 ambient;
-out vec4 Color;// ピクセルシェーダに渡す色
+out vec4 v_normal;
+out vec3 v_position;
 out vec2 v_tex_coords;
-out vec4 Ambient;
-void main()
-{
-    mat4 MVP=identity;
-    mat4 MIT =transpose(inverse(rotate*identity));
-    gl_Position = rotate*identity * vec4(position, 1.0);// 頂点のmvp変換
-    vec3 n = clamp(normalize(mat3(MIT) * norm), 0.0, 1.0);// 法線のm変換
-    float nl = dot(n, normalize(-wlightDir));// 法線とライトの内積を算出
-    nl=nl*0.5+0.5;
-    vec3 c = diffuse.rgb * nl;// 最終色を算出
-    c = clamp(c, 0.0, 1.0);// 0.0 ~ 1.0に色を収める
-    Color = vec4(c, diffuse.a);
+out vec4 shadow_coord;
+out vec4 model_normal;
+void main() {
+    gl_Position =  mvp*vec4(-position[0], position[1], position[2], position[3]);
+    model_normal = model_matrix *normal;
+    v_normal = transpose(inverse(model_matrix*view_matrix)) *normal;
+    shadow_coord = depth_bias_mvp *vec4(-position[0], position[1], position[2], position[3]);
     v_tex_coords=vec2(uv[0], 1.0-uv[1]);
-    Ambient=vec4(ambient, 1.0);
+    v_position=gl_Position.xyz/gl_Position.w;
 }

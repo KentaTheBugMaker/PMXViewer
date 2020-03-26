@@ -351,9 +351,9 @@ pub mod pmx_types {
 
     impl Display for PMXTextureList {
         fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-            writeln!(f, "Textures:{}", self.textures.len());
+            let _result=writeln!(f, "Textures:{}", self.textures.len());
             for name in self.textures.iter() {
-                writeln!(f, "{}", name);
+                let _result=writeln!(f, "{}", name);
             }
             Ok(())
         }

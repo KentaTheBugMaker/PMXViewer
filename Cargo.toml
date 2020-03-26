@@ -13,5 +13,6 @@ genmesh = "*"
 obj = "*"
 glutin ="*"
 image = "*"
+cgmath = "*"
 [build-dependencies]
 gl_generator = "*"

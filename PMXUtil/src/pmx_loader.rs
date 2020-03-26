@@ -3,7 +3,7 @@ pub mod pmx_loader {
 
     use crate::binary_reader::BinaryReader;
     use crate::pmx_types::pmx_types::{BONE_FLAG_APPEND_ROTATE_MASK, BONE_FLAG_APPEND_TRANSLATE_MASK, BONE_FLAG_DEFORM_OUTER_PARENT_MASK, BONE_FLAG_FIXED_AXIS_MASK, BONE_FLAG_IK_MASK, BONE_FLAG_LOCAL_AXIS_MASK, BONE_FLAG_TARGET_SHOW_MODE_MASK, BoneMorph, Encode, GroupMorph, MaterialMorph, MorphTypes, PMXBone, PMXBones, PMXFace, PMXFaces, PMXHeaderC, PMXHeaderRust, PMXIKLink, PMXMaterial, PMXMaterials, PMXModelInfo, PMXMorph, PMXMorphs, PMXSphereMode, PMXTextureList, PMXToonMode, PMXVertex, PMXVertexWeight, PMXVertices, ReaderStage, UVMorph, VertexMorph};
-    use crate::pmx_types::pmx_types::PMXDrawModeFlags::GroundShadow;
+
 
     pub fn transform_header_c2r(header: PMXHeaderC) -> PMXHeaderRust {
         let mut ctx = PMXHeaderRust {

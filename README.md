@@ -1,13 +1,13 @@
 ### PMXLoader
 ## A simple PMX loader written in Rust
 ### What can this crate do
-  1. Parse PMX 2.0/2.1 header
+  1. Parse PMX 2.0/2.1 _header
   2. Parse PMX 2.0/2.1 Model Info
       - Name
       - English Name
       - Comment
       - English Comment
-  3. Parse Vertices Information
+  3. Parse vertices Information
   4. Parse Material Information
   5. Parse Bone Information
   6. Parse Morph Information
@@ -25,10 +25,10 @@ use PMXUtil::pmx_loader::pmx_loader::PMXLoader;
 2. Create loader instance and read  
 ```
 let mut loader=PMXLoader::open("/path/to/pmxfile");
-//get header information
-let header=loader.get_header();
+//get _header information
+let _header=loader.get_header();
 //get model information returns Result<PMXModelInfo,()>
-let model_info=loader.read_pmx_model_info().unwrap();
+let _model_info=loader.read_pmx_model_info().unwrap();
 ```
 
 

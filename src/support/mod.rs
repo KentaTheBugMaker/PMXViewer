@@ -1,62 +1,54 @@
-#![allow(dead_code)]
+pub mod support {
+    fn perspective(aspect_ratio: f32, fov: f32, zfar: f32, znear: f32) -> [[f32; 4]; 4] {
+        let f = 1.0 / (fov / 2.0).tan();
+        [[f * aspect_ratio, 0.0, 0.0, 0.0],
+            [0.0, f, 0.0, 0.0],
+            [0.0, 0.0, (zfar + znear) / (zfar - znear), 1.0],
+            [0.0, 0.0, -(2.0 * zfar * znear) / (zfar - znear), 0.0]]
+    }
 
-extern crate genmesh;
-extern crate obj;
 
-use std::time::{Duration, Instant};
+    fn rotate_y(theta: f32) -> [[f32; 4]; 4] {
+        let cos = theta.cos();
+        let sin = theta.sin();
+        [[cos, 0.0, sin, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [-sin, 0.0, cos, 0.0],
+            [0.0, 0.0, 0.0, 1.0]]
+    }
 
-use glium::{self, Display};
-use glium::glutin::event::{Event, StartCause};
-use glium::glutin::event_loop::{ControlFlow, EventLoop};
-#[macro_use]
-use glium::implement_vertex;
-use glium::vertex::VertexBufferAny;
 
-pub mod camera;
-
-pub enum Action {
-    Stop,
-    Continue,
-}
-
-pub fn start_loop<F>(event_loop: EventLoop<()>, mut callback: F) -> ! where F: 'static + FnMut(&Vec<Event<()>>) -> Action {
-    let mut events_buffer = Vec::new();
-    let mut next_frame_time = Instant::now();
-    event_loop.run(move |event, _, control_flow| {
-        let run_callback = match event.to_static() {
-            Some(Event::NewEvents(cause)) => {
-                match cause {
-                    StartCause::ResumeTimeReached { .. } | StartCause::Init => {
-                        true
-                    }
-                    _ => false
-                }
-            }
-            Some(event) => {
-                events_buffer.push(event);
-                false
-            }
-            None => {
-                // Ignore this event.
-                false
-            }
+    fn view_matrix(position: &[f32; 3], direction: &[f32; 3], up: &[f32; 3]) -> [[f32; 4]; 4] {
+        let f = {
+            let f = direction;
+            let len = f[0] * f[0] + f[1] * f[1] + f[2] * f[2];
+            let len = len.sqrt();
+            [f[0] / len, f[1] / len, f[2] / len]
         };
 
-        let action = if run_callback {
-            let action = callback(&events_buffer);
-            next_frame_time = Instant::now() + Duration::from_nanos(16666667);
+        let s = [up[1] * f[2] - up[2] * f[1],
+            up[2] * f[0] - up[0] * f[2],
+            up[0] * f[1] - up[1] * f[0]];
 
-            events_buffer.clear();
-            action
-        } else {
-            Action::Continue
+        let s_norm = {
+            let len = s[0] * s[0] + s[1] * s[1] + s[2] * s[2];
+            let len = len.sqrt();
+            [s[0] / len, s[1] / len, s[2] / len]
         };
 
-        match action {
-            Action::Continue => {
-                *control_flow = ControlFlow::WaitUntil(next_frame_time);
-            }
-            Action::Stop => *control_flow = ControlFlow::Exit
-        }
-    })
+        let u = [f[1] * s_norm[2] - f[2] * s_norm[1],
+            f[2] * s_norm[0] - f[0] * s_norm[2],
+            f[0] * s_norm[1] - f[1] * s_norm[0]];
+
+        let p = [-position[0] * s_norm[0] - position[1] * s_norm[1] - position[2] * s_norm[2],
+            -position[0] * u[0] - position[1] * u[1] - position[2] * u[2],
+            -position[0] * f[0] - position[1] * f[1] - position[2] * f[2]];
+
+        [
+            [s_norm[0], u[0], f[0], 0.0],
+            [s_norm[1], u[1], f[1], 0.0],
+            [s_norm[2], u[2], f[2], 0.0],
+            [p[0], p[1], p[2], 1.0],
+        ]
+    }
 }
