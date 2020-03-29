@@ -13,10 +13,14 @@ out vec2 v_tex_coords;
 out vec4 shadow_coord;
 out vec4 model_normal;
 void main() {
-    gl_Position =  mvp*vec4(-position[0], position[1], position[2], position[3]);
+
+   vec4 position0=vec4(-position.x, position.yzw);
+    position0.xyz*=position.w;
+    gl_Position =  mvp*position0;
     model_normal = model_matrix *normal;
     v_normal = transpose(inverse(model_matrix*view_matrix)) *normal;
-    shadow_coord = depth_bias_mvp *vec4(-position[0], position[1], position[2], position[3]);
+    shadow_coord = depth_bias_mvp *position0;
     v_tex_coords=vec2(uv[0], 1.0-uv[1]);
-    v_position=gl_Position.xyz/gl_Position.w;
-}
+    v_position=position0.xyz;
+
+    }
