@@ -70,7 +70,9 @@ fn make_draw_asset(display: &Display, faces: &mut PMXFaces, texture_list: PMXTex
     let v = &mut faces.faces;
     let mut end;
     let mut textures: Vec<Texture2d> = Vec::new();
+    let blank_texture_id=texture_list.textures.len();
     //Texture Load
+    println!("Start Loading Textures...");
     let path = std::path::Path::new(&filename);
     let path = path.parent().unwrap().to_str().unwrap();
     for texture_name in texture_list.textures {
@@ -83,16 +85,27 @@ fn make_draw_asset(display: &Display, faces: &mut PMXFaces, texture_list: PMXTex
         let texture = glium::texture::Texture2d::new(display, image).unwrap();
         textures.push(texture);
     }
+    let image=image::open("./blank.png").unwrap().to_rgba();
+    let dimensions=image.dimensions();
+    let image=glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw(),dimensions);
+    let texture=glium::texture::Texture2d::new(display,image).unwrap();
+    textures.push(texture);
+    println!("End Loading Textures...");
     for material in materials.materials {
         end = (material.num_face_vertices / 3) as usize;//
         println!("len:{},({},{})", v.len(), 0, end);
         let v = v.drain(0..end).collect();
         let faces = PMXFaces { faces: v };
         let ibo = convert_index_buffer(&display, &faces);
-        let ti = material.texture_index as usize;
+
+        let mut ti = material.texture_index as usize;//-1が渡されたときクラッシュ
+        if ti>=blank_texture_id{
+            ti=blank_texture_id;
+        }
         let asset = DrawAsset { ibo: Rc::new(ibo), texture: ti, diffuse: material.diffuse, ambient: material.ambient, specular: material.specular, specular_intensity: material.specular_factor };
         out.push(asset);
     }
+    println!("End Create Render Asset");
     (out, textures)
 }
 
@@ -228,6 +241,7 @@ fn main() {
                 };
                 for asset in &assets {
                     let ibo: &IndexBuffer<u32> = asset.ibo.borrow();
+                    println!("ibo.len()={}",ibo.len());
                     target.draw(
                         &vbo,
                         ibo,
@@ -274,6 +288,7 @@ fn main() {
             let mvp = perspective_matrix * view_matrix * md.model_matrix;
             let depth_bias_mvp = bias_matrix * md.depth_mvp;
             for asset in &assets {
+                println!("TextureID={}",asset.texture);
                 let ibo: &IndexBuffer<u32> = asset.ibo.borrow();
                 let uniforms = uniform! {
                 light_loc: light_loc,
