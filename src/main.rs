@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::rc::Rc;
 use std::time::Instant;
+
 use cgmath::SquareMatrix;
 #[macro_use]
 use glium::{implement_vertex, uniform};
@@ -15,9 +16,10 @@ use glium::{glutin, Surface};
 use glium::{Display, IndexBuffer, VertexBuffer};
 use glium::index::PrimitiveType;
 use glium::texture::Texture2d;
-use crate::glutin::dpi::LogicalSize;
 use PMXUtil::pmx_loader::pmx_loader::PMXLoader;
 use PMXUtil::pmx_types::pmx_types::{PMXFaces, PMXMaterials, PMXTextureList, PMXVertex, PMXVertices};
+
+use crate::glutin::dpi::LogicalSize;
 
 #[derive(Copy, Clone)]
 pub struct GliumVertex {
@@ -119,7 +121,7 @@ fn main() {
     let vbo = convert_vertex_buffer(&display, &pmx_vertices);
     let (assets, textures) = make_draw_asset(&display, &mut pmx_faces, pmx_textures, pmx_materials, &path);
     let mut model_data = [
-        ModelData::color([1.0, 1.0, 1.0]).translate([0.0,-1.0,0.0]).scale(0.1)
+        ModelData::color([1.0, 1.0, 1.0]).translate([0.0, -1.0, 0.0]).scale(0.1)
     ];
 
     let mut src_shadow_vertex = String::new();
@@ -135,9 +137,9 @@ fn main() {
     BufReader::new(File::open("./shaders/vertex_shader.glsl").unwrap()).read_to_string(&mut src_vertex).unwrap();
     let mut src_fragment = String::new();
     BufReader::new(File::open("./shaders/fragment_shader.glsl").unwrap()).read_to_string(&mut src_fragment).unwrap();
-        let mut src_geometry = String::new();
+    let mut src_geometry = String::new();
     BufReader::new(File::open("./shaders/geometry_shader.glsl").unwrap()).read_to_string(&mut src_geometry).unwrap();
-    let render_shaders = glium::Program::from_source(&display, &src_vertex, &src_fragment,None).unwrap();
+    let render_shaders = glium::Program::from_source(&display, &src_vertex, &src_fragment, Some(&src_geometry)).unwrap();
     let shadow_texture = glium::texture::DepthTexture2d::empty(&display, shadow_map_size, shadow_map_size).unwrap();
 
     let mut start = Instant::now();
@@ -167,7 +169,7 @@ fn main() {
                 glutin::event::WindowEvent::CloseRequested => {
                     *control_flow = glutin::event_loop::ControlFlow::Exit;
                     return;
-                },
+                }
                 glutin::event::WindowEvent::KeyboardInput { input, .. } => if input.state == glutin::event::ElementState::Pressed {
                     if let Some(key) = input.virtual_keycode {
                         match key {
@@ -240,7 +242,7 @@ fn main() {
         // Render the scene from the camera's point of view
         // ===============================================================================
         let screen_ratio = (win_size.width / win_size.height) as f32;
-        let perspective_matrix: cgmath::Matrix4<f32> =cgmath::perspective(cgmath::Deg(45.0),screen_ratio,0.001,100.0).into();
+        let perspective_matrix: cgmath::Matrix4<f32> = cgmath::perspective(cgmath::Deg(45.0), screen_ratio, 0.001, 100.0).into();
         let camera_x = 3.0 * camera_t.cos();
         let camera_z = 3.0 * camera_t.sin();
         let view_eye: cgmath::Point3<f32> = cgmath::Point3::new(camera_x as f32, 2.0, camera_z as f32);
